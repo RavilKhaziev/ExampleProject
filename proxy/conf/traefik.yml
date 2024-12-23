@@ -1,0 +1,44 @@
+api:
+  dashboard: true
+  insecure: false
+serversTransport:
+  insecureSkipVerify: true
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: false
+  websecure:
+    address: ":443"
+providers:
+  # First, a docker provider, which allows us to enable routing to any Docker
+  # container by setting some specific labels on the container. Example will
+  # follow below ;).
+  docker:
+    network: traefik
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+  file:
+    filename: "/tls_conf.yml"
+certificatesResolvers:
+  myresolver:
+    acme:
+      email: ${TRAEFIK_CERT_EMAIL}
+      storage: /certs/acme.json
+      #caServer: https://acme-v02.api.letsencrypt.org/directory
+      #tlsChallenge: {}
+      httpChallenge:
+        entryPoint: web
+      #dnsChallenge:
+        #provider: regru
+        #delayBeforeCheck: 1000
+        #resolvers:
+          #- "1.1.1.1:53"
+          #- "8.8.8.8:53"
+log:
+  level: TRACE # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: common # common, json, logfmt

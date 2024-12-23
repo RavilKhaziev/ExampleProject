@@ -1,0 +1,18 @@
+﻿@inject ApplicationDbContext db
+@{
+    // await db.Database.EnsureCreatedAsync();
+
+    // var pageViews = db.PageViews.Where(x =>x.Url == Context.Request.Path.Value!).SingleOrDefault();
+    // if (pageViews == null)
+    // {
+    //     pageViews = new() { Url = Context.Request.Path.Value!, ViewCount = 1 };
+    //     await db.PageViews.AddAsync(pageViews);
+    // }
+    // else
+    // {
+    //     pageViews.ViewCount++;
+    // }
+    // await db.SaveChangesAsync();
+    // ViewData["Views"] = Context.Request.Path.Value!;
+    Layout = "_Layout";
+}

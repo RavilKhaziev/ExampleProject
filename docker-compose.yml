@@ -1,0 +1,78 @@
+services:
+  example_web: 
+    hostname: web # название нашего контейнера в сети docker-а
+    image: ${DOCKER_REGISTRY-}exampleproject
+    env_file: ".env" # прокидываем сюда переменные которые мы объявили выше
+    build:
+      context: . # контекст сборки образа из директории в котором находиться docker-compose file
+      dockerfile: ExampleProject/Dockerfile # указываем на сам файл сборки образа относительно указанного контекста
+    ports: # прокидываем порт 80 контейнера в внутренею сеть docker
+     - "8080:8080" 
+    networks: # сети в которой будет доступен сам контейнер
+     - web
+     - proxy
+    labels:
+      - "traefik.enable=true" # Говорим traefik что этот контейнер нужно прокинуть в глобальную сеть
+      - "traefik.http.routers.example-web.tls=true" # Говорим traefik что нужно включить tls
+      - "traefik.http.routers.example-web.tls.certresolver=myresolver" # создаём нового исполнителя для нахождения наших сертификатов
+      - "traefik.http.routers.example-web.entrypoints=websecure" # говорим что нужно принимать только защищённое соединение
+      - "traefik.http.routers.example-web.rule=Host(\"${HOSTNAME:-localhost}\")" # говорим traefik что нужно посылать наши http запросы в этот контейнер если url запроса был ${WEB_DOMAIN} 
+      - "traefik.http.routers.example-web.service=example-web-service" # говорим что нужно использовать router который мы заполнили выше
+      - "traefik.http.services.example-web-service.loadbalancer.server.port=8080" # говорим traefik на какой порт кидать наш http запрос
+  example_db:
+   hostname: db # название нашего контейнера в сети docker-а
+   env_file: ".env" # прокидываем сюда переменные которые мы объявили выше
+   container_name: db
+   restart: always # делаем рестарт контейнера если он упал
+   image: postgres:17-alpine # берём официальный образ postgresql из docker.hub-a
+   networks: # сети в которой будет доступен сам контейнер
+    - web
+   expose: # прокидываем порт 5432 контейнера в внутренею сеть docker
+    - "5432"
+   volumes: # указываем докеру куда ему нужно вмонтировать нашу базу в контейнере
+    - example_data:/var/lib/postgresql/data
+   environment:
+    POSTGRES_DB: "${POSTGRES_DB}" # название базы 
+    POSTGRES_USER: "${POSTGRES_USER}"  # пользователь базы 
+    POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD}"
+    DB_DEV_HOST: localhost
+    DB_HOST: db
+    PGDATA: "/var/lib/postgresql/data/pgdata" # указываем субд где находиться база в контейнере
+  proxy:
+    hostname: proxy # название нашего контейнера в сети docker-а
+    env_file: ".env" # прокидываем сюда переменные которые мы объявили выше
+    build: 
+      context: ./proxy # контекст сборки образа из директории в котором находиться docker-compose file
+      dockerfile: dockerfile # указываем на сам файл сборки образа относительно указанного контекста
+    ports: # указываем докеру что нужно прокинуть порты на машине
+      - target: 80
+        published: 80
+        protocol: tcp
+      - target: 443
+        published: 443
+        protocol: tcp
+    networks: # сети в которой будет доступен сам контейнер
+      - proxy
+    restart: always # делаем рестарт контейнера если он упал
+    labels:
+      - "traefik.enable=true" # Говорим traefik что этот контейнер нужно прокинуть в глобальную сеть
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_PASSWORD:-user:$$2y$$05$$n54Yf1ZIHGvQwEiufkA0reIQkfMx8.UOrfxRtHQ8zGDGOOdC1OjF6}" # Заменить логин user пароль password
+      #- "traefik.http.routers.dashboard.tls.certresolver=myresolver"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.rule=Host(\"${PROXY_DASHBOARD_DOMAIN:-proxy.localhost}\")"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # указываем где находиться докер
+      - ./proxy/certs/:/certs/ # сертификаты будут тут
+      - ./proxy/conf/traefik.yml:/etc/traefik/traefik.yml # конфиг файлы
+      - ./proxy/conf/tls_conf.yml:/tls_conf.yml:ro # конфиг файлы для tls
+networks: # указываем какие нужно создать сети
+ web:  # сеть с именем web
+ proxy: # сеть с именем proxy
+  driver: bridge  
+volumes:
+  example_data:

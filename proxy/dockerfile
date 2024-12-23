@@ -1,0 +1,4 @@
+FROM traefik:latest
+WORKDIR /certs
+ADD /certs /certs/
+RUN touch /certs/acme.json && chmod 600 /certs/acme.json
